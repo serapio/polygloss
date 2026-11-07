@@ -98,9 +98,12 @@ def train(
     since_best = 0
     for epoch in range(start_epoch, config.max_epochs):
         if distributed_parameters["distributed"]:
-            assert isinstance(train_dataloader.sampler, DistributedSampler)
             assert isinstance(dev_dataloader.sampler, DistributedSampler)
-            train_dataloader.sampler.set_epoch(epoch)
+            if hasattr(train_dataloader.batch_sampler, "set_epoch"):
+                train_dataloader.batch_sampler.set_epoch(epoch)  # type: ignore[attr-defined]
+            else:
+                assert isinstance(train_dataloader.sampler, DistributedSampler)
+                train_dataloader.sampler.set_epoch(epoch)
 
         model.train()
         if config.mode in ["pretrain", "finetune", "lora"]:

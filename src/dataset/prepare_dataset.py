@@ -27,6 +27,7 @@ from src.config.experiment_config import MODEL_TYPE
 from src.distributed import DistributedParameters
 from src.train import ExperimentConfig
 from src.util.collator import FlexibleCollatorWithPadding, FlexibleSeq2SeqCollator
+from src.util.sampling import LengthBucketBatchSampler
 
 logger = logging.getLogger(__name__)
 
@@ -280,6 +281,21 @@ def create_dataloader(
     else:
         sampler = (
             RandomSampler(dataset) if split == "train" else SequentialSampler(dataset)
+        )
+    if config.length_bucketed_batching and split == "train":
+        batch_sampler = LengthBucketBatchSampler(
+            [len(input_ids) for input_ids in dataset["input_ids"]],  # type:ignore
+            batch_size=config.batch_size,
+            drop_last=distributed_parameters["distributed"],
+            num_replicas=distributed_parameters["world_size"],
+            rank=distributed_parameters["rank"],
+        )
+        return DataLoader(
+            dataset,  # type:ignore
+            batch_sampler=batch_sampler,
+            collate_fn=collator,
+            num_workers=num_workers,
+            pin_memory=True,
         )
     return DataLoader(
         dataset,  # type:ignore

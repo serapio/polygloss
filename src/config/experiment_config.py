@@ -97,6 +97,9 @@ class ExperimentConfig:
     batch_size: int = 64  # per gpu
     """Batch size per GPU for training and evaluation"""
 
+    length_bucketed_batching: bool = False
+    """If true, training batches group examples of similar length to reduce padding"""
+
     gradient_accumulation_steps: int = 1
     """Number of gradient accumulation steps to simulate larger batch sizes"""
 
