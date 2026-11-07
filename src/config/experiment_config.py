@@ -51,6 +51,9 @@ class ExperimentConfig:
     glottocode: str | None = None
     """Glottocode of the language to finetune on (None for pretraining on all languages)"""
 
+    pretrain_with_dev: bool = True
+    """If true, pretraining merges train and dev into iid splits (released recipe); if false, trains on the train split only and keeps dev as validation"""
+
     task_format: TASK_FORMAT = "multitask"
     """Format for the joint seg/glossing"""
 

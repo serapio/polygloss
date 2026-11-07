@@ -49,7 +49,7 @@ def create_dataset(
     dataset = datasets.load_dataset(config.dataset_key)
 
     dataset = cast(datasets.DatasetDict, dataset)
-    dataset = _filter(dataset, config.glottocode)
+    dataset = _filter(dataset, config.glottocode, config.pretrain_with_dev)
     inputs_dataset = datasets.DatasetDict()
 
     if "glosslm" in config.pretrained_model:
@@ -292,7 +292,11 @@ def create_dataloader(
     )
 
 
-def _filter(dataset: datasets.DatasetDict, glottocode: str | None):
+def _filter(
+    dataset: datasets.DatasetDict,
+    glottocode: str | None,
+    pretrain_with_dev: bool = True,
+):
     """Filter down to the relevant examples (depending on pretraining vs finetuning)"""
     dataset = dataset.filter(
         lambda x: x["transcription"] is not None and x["glosses"] is not None
@@ -307,15 +311,20 @@ def _filter(dataset: datasets.DatasetDict, glottocode: str | None):
             raise ValueError(f"Dataset does not contain glottocode {glottocode}!")
         new_dataset = dataset
     else:
-        print("Re-splitting dataset for pretraining")
-        # We must be pretraining
-        # Instead of language-specific eval sets, let's use all of the pretraining and ID eval data and make iid splits
-        pretraining_data = datasets.concatenate_datasets(
-            [dataset["train"], dataset["dev"]]
-        )
-        pretraining_data = pretraining_data.train_test_split(test_size=0.1, seed=0)
-        new_dataset["train"] = pretraining_data["train"]
-        new_dataset["dev"] = pretraining_data["test"]
+        if pretrain_with_dev:
+            print("Re-splitting dataset for pretraining")
+            # We must be pretraining
+            # Instead of language-specific eval sets, let's use all of the pretraining and ID eval data and make iid splits
+            pretraining_data = datasets.concatenate_datasets(
+                [dataset["train"], dataset["dev"]]
+            )
+            pretraining_data = pretraining_data.train_test_split(test_size=0.1, seed=0)
+            new_dataset["train"] = pretraining_data["train"]
+            new_dataset["dev"] = pretraining_data["test"]
+        else:
+            print("Pretraining on the train split only (dev held out)")
+            new_dataset["train"] = dataset["train"]
+            new_dataset["dev"] = dataset["dev"]
         new_dataset["test"] = dataset["test"]
     return new_dataset
 
