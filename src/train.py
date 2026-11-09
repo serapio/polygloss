@@ -58,7 +58,8 @@ def train(
     start_epoch = 0
     step = 0
     max_steps = (
-        config.max_epochs * len(train_dataloader) // config.gradient_accumulation_steps
+        math.ceil(len(train_dataloader) / config.gradient_accumulation_steps)
+        * config.max_epochs
     )
     if config.use_warmup:
         total_warmup_steps = int(0.03 * max_steps)
@@ -225,7 +226,8 @@ def train_epoch(
         for key in keys_to_pop:
             batch.pop(key)
         batch = batch.to(device)
-        optimizer.zero_grad()
+        if batch_idx % config.gradient_accumulation_steps == 0:
+            optimizer.zero_grad()
 
         # Train in bfloat16
         with torch.amp.autocast_mode.autocast(
@@ -236,8 +238,12 @@ def train_epoch(
             loss = loss / config.gradient_accumulation_steps
         loss.backward()
 
-        # Only update weights every accumulation_steps batches
-        if (step + 1) % config.gradient_accumulation_steps == 0:
+        # Only update weights every accumulation_steps batches (and on the last batch)
+        is_accumulation_boundary = (
+            batch_idx + 1
+        ) % config.gradient_accumulation_steps == 0
+        is_last_batch = (batch_idx + 1) == len(train_dataloader)
+        if is_accumulation_boundary or is_last_batch:
             torch.nn.utils.clip_grad_norm_(
                 model.parameters(), max_norm=config.grad_norm
             )
